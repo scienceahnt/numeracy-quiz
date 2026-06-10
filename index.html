@@ -111,6 +111,31 @@
   .bd-name{flex:1; font-weight:700; font-size:.92rem}
   .bd-score{font-weight:800; font-size:.92rem; color:var(--c); font-variant-numeric:tabular-nums}
   .sent{font-size:.83rem; color:var(--ink-soft); margin-top:14px; min-height:1.2em}
+
+  /* 모드 탭 */
+  .modetabs{display:flex; gap:8px; background:#eef1f8; padding:5px; border-radius:14px; margin-bottom:20px}
+  .modetab{flex:1; border:none; background:transparent; padding:11px; border-radius:10px;
+    font-family:inherit; font-size:.95rem; font-weight:700; color:var(--ink-soft); cursor:pointer; transition:.12s}
+  .modetab.on{background:#fff; color:var(--accent); box-shadow:var(--shadow)}
+  .examnote{background:color-mix(in srgb,var(--accent) 7%,#fff);
+    border:1.5px solid color-mix(in srgb,var(--accent) 22%,#fff); border-radius:13px;
+    padding:14px 16px; font-size:.9rem; line-height:1.7; color:var(--ink); margin-bottom:18px}
+
+  /* 정기시험 오답 리뷰 */
+  .review{text-align:left; margin:6px 0 4px}
+  .review h3{font-size:.95rem; font-weight:800; margin:18px 0 12px; color:var(--ink)}
+  .rev-item{border:1.5px solid var(--line); border-radius:13px; padding:13px 15px; margin-bottom:10px}
+  .rev-item.wrong{border-color:color-mix(in srgb,var(--wrong) 40%,#fff); background:var(--wrong-bg)}
+  .rev-item.right{border-color:color-mix(in srgb,var(--right) 35%,#fff); background:var(--right-bg)}
+  .rev-top{display:flex; align-items:center; gap:8px; font-size:.82rem; margin-bottom:7px}
+  .rev-no{font-weight:800; color:var(--ink)}
+  .rev-area{color:var(--ink-soft)}
+  .rev-mark{margin-left:auto; font-weight:800; font-size:.9rem}
+  .rev-mark.o{color:var(--right)} .rev-mark.x{color:var(--wrong)}
+  .rev-q{font-weight:700; font-size:.98rem; margin-bottom:8px}
+  .rev-ans{font-size:.88rem; line-height:1.7}
+  .rev-ans .mine{color:var(--wrong); font-weight:700}
+  .rev-ans .correct{color:var(--right); font-weight:700}
 </style>
 </head>
 <body>
@@ -123,13 +148,35 @@
 
   <!-- 시작 -->
   <div class="card setup" id="setup">
+    <div class="modetabs">
+      <button class="modetab on" id="tabPractice" onclick="setMode('practice')">연습 모드</button>
+      <button class="modetab" id="tabExam" onclick="setMode('exam')">정기시험</button>
+    </div>
+
     <label for="name">학번 / 이름</label>
     <input id="name" placeholder="예) 3101 홍길동" autocomplete="off">
-    <label>영역 선택 <span style="font-weight:500;color:var(--ink-soft)">· 여러 개 고르면 골고루 출제</span></label>
-    <div class="areas" id="areaGrid"></div>
-    <label for="count">문제 수</label>
-    <input id="count" type="number" value="10" min="1" max="30">
-    <button class="act primary" onclick="startQuiz()">시작하기</button>
+
+    <!-- 연습 모드 전용 -->
+    <div id="practicePane">
+      <label>영역 선택 <span style="font-weight:500;color:var(--ink-soft)">· 여러 개 고르면 골고루 출제</span></label>
+      <div class="areas" id="areaGrid"></div>
+      <label for="count">문제 수</label>
+      <input id="count" type="number" value="10" min="1" max="30">
+      <button class="act primary" onclick="startQuiz()">시작하기</button>
+    </div>
+
+    <!-- 정기시험 모드 전용 -->
+    <div id="examPane" class="hidden">
+      <div class="examnote">
+        6개 영역을 골고루 섞어 <b>25문항</b>을 출제합니다.<br>
+        중간 채점 없이 <b>끝까지 푼 뒤 한 번에 채점</b>합니다.
+      </div>
+      <label for="examPw">시험 비밀번호</label>
+      <input id="examPw" type="password" placeholder="선생님께 받은 번호" autocomplete="off" inputmode="numeric">
+      <div id="pwError" style="color:var(--wrong); font-size:.82rem; margin:-8px 0 14px; display:none">비밀번호가 올바르지 않습니다.</div>
+      <button class="act primary" onclick="startExam()">시험 시작</button>
+    </div>
+
     <div id="connStatus" style="font-size:.78rem; margin-top:14px; text-align:center"></div>
   </div>
 
@@ -158,6 +205,7 @@
     <div class="pct" id="finalPct"></div>
     <p class="timeSummary" id="timeSummary"></p>
     <div class="breakdown" id="breakdown"></div>
+    <div class="review hidden" id="review"></div>
     <div class="row">
       <button class="act ghost" onclick="location.reload()">다시 풀기</button>
     </div>
@@ -374,6 +422,21 @@ let total=0, idx=0, score=0, current=null, selected=-1, locked=false, studentNam
 let selectedAreas=[];
 let perArea={};          // {areaKey:{solved, correct}}
 let startTime=0, timerInt=null;
+let mode='practice';     // 'practice' | 'exam'
+let examQueue=[];        // 시험 모드: 미리 만든 문제 + 학생 선택 저장
+const EXAM_PW='11618';   // 정기시험 비밀번호
+// 정기시험 영역별 문항 배분 (합계 25)
+const EXAM_PLAN={num:4, muldiv:4, fracadd:4, fracmul:4, dec:5, mix:4};
+
+// 모드 전환
+function setMode(m){
+  mode=m;
+  document.getElementById('tabPractice').classList.toggle('on', m==='practice');
+  document.getElementById('tabExam').classList.toggle('on', m==='exam');
+  document.getElementById('practicePane').classList.toggle('hidden', m!=='practice');
+  document.getElementById('examPane').classList.toggle('hidden', m!=='exam');
+  document.getElementById('pwError').style.display='none';
+}
 
 // 영역 선택 UI 생성
 const grid=document.getElementById('areaGrid');
@@ -387,12 +450,44 @@ Object.entries(AREAS).forEach(([key,a])=>{
 });
 
 function startQuiz(){
+  mode='practice';
   studentName=document.getElementById('name').value.trim()||'(이름없음)';
   selectedAreas=[...document.querySelectorAll('.area.on')].map(e=>e.dataset.key);
   if(selectedAreas.length===0) selectedAreas=Object.keys(AREAS); // 미선택 시 전체
   total=Math.max(1,Math.min(30,parseInt(document.getElementById('count').value)||10));
   idx=0; score=0; perArea={};
   selectedAreas.forEach(k=>perArea[k]={solved:0,correct:0});
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('quiz').classList.remove('hidden');
+  startTime=Date.now();
+  timerInt=setInterval(updateTimer,1000);
+  loadQuestion();
+}
+
+function startExam(){
+  // 비밀번호 확인
+  const pw=document.getElementById('examPw').value.trim();
+  if(pw!==EXAM_PW){
+    document.getElementById('pwError').style.display='block';
+    return;
+  }
+  mode='exam';
+  studentName=document.getElementById('name').value.trim()||'(이름없음)';
+  // 영역 배분대로 25문항 미리 생성 후 섞기
+  examQueue=[];
+  selectedAreas=Object.keys(EXAM_PLAN);
+  perArea={}; selectedAreas.forEach(k=>perArea[k]={solved:0,correct:0});
+  Object.entries(EXAM_PLAN).forEach(([key,n])=>{
+    const area=AREAS[key];
+    for(let i=0;i<n;i++){
+      const gen=area.generators[rnd(0,area.generators.length-1)];
+      const q=gen(); q.areaKey=key; q.picked=-1;
+      examQueue.push(q);
+    }
+  });
+  shuffle(examQueue);
+  total=examQueue.length;
+  idx=0; score=0;
   document.getElementById('setup').classList.add('hidden');
   document.getElementById('quiz').classList.remove('hidden');
   startTime=Date.now();
@@ -407,34 +502,56 @@ function fmtTime(ms){
 
 let currentAreaKey='';
 function loadQuestion(){
-  // 선택 영역을 돌아가며 출제 → 골고루
-  currentAreaKey=selectedAreas[idx % selectedAreas.length];
+  if(mode==='exam'){
+    current=examQueue[idx];
+    currentAreaKey=current.areaKey;
+  }else{
+    // 연습: 선택 영역을 돌아가며 출제
+    currentAreaKey=selectedAreas[idx % selectedAreas.length];
+    const area=AREAS[currentAreaKey];
+    const gen=area.generators[rnd(0,area.generators.length-1)];
+    current=gen();
+  }
   const area=AREAS[currentAreaKey];
-  // 이 문제의 영역 색을 카드 전체 액센트로 주입
-  document.documentElement.style.setProperty('--accent', area.color);
-  const gen=area.generators[rnd(0,area.generators.length-1)];
-  current=gen();
-  selected=-1; locked=false;
-  document.getElementById('chiplabel').textContent=`${area.label} · ${area.chapters}`;
+  document.documentElement.style.setProperty('--accent', mode==='exam' ? '#5b6ef5' : area.color);
+  selected=(mode==='exam' ? current.picked : -1);
+  locked=false;
+  document.getElementById('chiplabel').textContent= mode==='exam'
+    ? `정기시험 · ${idx+1}번` : `${area.label} · ${area.chapters}`;
   document.getElementById('qtext').textContent=current.prompt;
   document.getElementById('figure').textContent=current.figure;
   const box=document.getElementById('opts'); box.innerHTML='';
   current.options.forEach((opt,i)=>{
     const el=document.createElement('div');
-    el.className='opt'; el.dataset.i=i;
+    el.className='opt'+(mode==='exam'&&current.picked===i?' sel':''); el.dataset.i=i;
     el.innerHTML=`<span class="badge">${circled[i]}</span><span>${opt}</span>`;
     el.onclick=()=>selectOpt(i,el);
     box.appendChild(el);
   });
   document.getElementById('feedback').className='feedback';
-  document.getElementById('checkBtn').classList.remove('hidden');
-  document.getElementById('checkBtn').disabled=true;
-  document.getElementById('nextBtn').classList.add('hidden');
+  if(mode==='exam'){
+    // 시험: 채점 버튼 숨기고, 이동 버튼만
+    document.getElementById('checkBtn').classList.add('hidden');
+    const nb=document.getElementById('nextBtn');
+    nb.classList.remove('hidden');
+    nb.textContent=(idx+1>=total)?'제출하기':'다음 문제';
+    nb.disabled=false;
+  }else{
+    document.getElementById('checkBtn').classList.remove('hidden');
+    document.getElementById('checkBtn').disabled=true;
+    document.getElementById('nextBtn').classList.add('hidden');
+  }
   updateProgress();
   updateTimer();
 }
 
 function selectOpt(i,el){
+  if(mode==='exam'){
+    current.picked=i; selected=i;
+    document.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
+    el.classList.add('sel');
+    return;
+  }
   if(locked)return;
   selected=i;
   document.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
@@ -462,7 +579,27 @@ function checkAnswer(){
   updateProgress();
 }
 
-function nextQuestion(){idx++; if(idx>=total){finish();return;} loadQuestion();}
+function nextQuestion(){
+  if(mode==='exam'){
+    idx++;
+    if(idx>=total){ gradeExam(); return; }
+    loadQuestion();
+    return;
+  }
+  idx++; if(idx>=total){finish();return;} loadQuestion();
+}
+
+// 시험 모드: 끝까지 푼 뒤 한 번에 채점
+function gradeExam(){
+  score=0;
+  selectedAreas.forEach(k=>perArea[k]={solved:0,correct:0});
+  examQueue.forEach(q=>{
+    const p=perArea[q.areaKey];
+    p.solved++;
+    if(q.picked===q.answer){ score++; p.correct++; }
+  });
+  finish();
+}
 
 function updateProgress(){
   const done=idx+(locked?1:0);
@@ -481,7 +618,8 @@ function finish(){
   document.getElementById('quiz').classList.add('hidden');
   const d=document.getElementById('done'); d.classList.remove('hidden');
   document.getElementById('finalScore').textContent=`${score} / ${total}`;
-  document.getElementById('finalPct').textContent=`정답률 ${Math.round(score/total*100)}%`;
+  document.getElementById('finalPct').textContent=
+    (mode==='exam'?'📝 정기시험 · ':'')+`정답률 ${Math.round(score/total*100)}%`;
   document.getElementById('timeSummary').textContent=`⏱ 소요 시간 ${fmtTime(elapsed)} · 문항당 평균 ${(elapsed/1000/total).toFixed(1)}초`;
   // 영역별 집계 표 (색 점 + 점수)
   const bd=document.getElementById('breakdown'); bd.innerHTML='';
@@ -492,6 +630,31 @@ function finish(){
     r.innerHTML=`<span class="bd-dot"></span><span class="bd-name">${AREAS[k].label}</span><span class="bd-score">${p.correct} / ${p.solved}</span>`;
     bd.appendChild(r);
   });
+  // 정기시험: 문항별 오답+정답 리뷰
+  const rev=document.getElementById('review');
+  if(mode==='exam'){
+    rev.classList.remove('hidden');
+    let html='<h3>📋 문항별 리뷰</h3>';
+    examQueue.forEach((q,i)=>{
+      const ok=q.picked===q.answer;
+      const mine = q.picked>=0 ? `${circled[q.picked]} ${q.options[q.picked]}` : '(무응답)';
+      const correct = `${circled[q.answer]} ${q.options[q.answer]}`;
+      html+=`<div class="rev-item ${ok?'right':'wrong'}">
+        <div class="rev-top">
+          <span class="rev-no">${i+1}번</span>
+          <span class="rev-area">${AREAS[q.areaKey].label}</span>
+          <span class="rev-mark ${ok?'o':'x'}">${ok?'○ 정답':'✕ 오답'}</span>
+        </div>
+        <div class="rev-q">${q.prompt} <b>${q.figure}</b></div>
+        <div class="rev-ans">${ok
+          ? `정답 <span class="correct">${correct}</span>`
+          : `내 답 <span class="mine">${mine}</span> · 정답 <span class="correct">${correct}</span>`}</div>
+      </div>`;
+    });
+    rev.innerHTML=html;
+  }else{
+    rev.classList.add('hidden'); rev.innerHTML='';
+  }
   sendResult(elapsed);
 }
 
@@ -519,6 +682,7 @@ function sendResult(elapsed){
   const sec=Math.round(elapsed/1000);
   const payload={
     name:studentName, score:score, total:total,
+    mode:(mode==='exam'?'정기시험':'연습'),
     seconds:fmtKorean(sec),
     areas:selectedAreas.map(k=>`${AREAS[k].label}:${perArea[k].correct}/${perArea[k].solved}`).join(' | '),
     time:fmtKST(new Date())
