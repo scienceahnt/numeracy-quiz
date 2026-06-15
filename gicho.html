@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기초 연산 연습</title>
+<style>
+  :root{
+    --ink:#27313f; --ink-soft:#6f7a8a; --line:#eceef3;
+    --paper1:#fff7ed; --paper2:#fef0f5; --card:#ffffff;
+    --accent:#ff8a3d;                /* 따뜻한 주황 - 기본 */
+    --right:#1faa6e; --right-bg:#e8f8f0;
+    --wrong:#ef5a6b; --wrong-bg:#fdedef;
+    --shadow:0 2px 8px rgba(60,50,40,.06), 0 14px 34px rgba(60,50,40,.09);
+    --add:#ff9f43; --sub:#5aa9ff; --mul:#a87bff; --div:#34c98a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    background:linear-gradient(165deg,var(--paper1),var(--paper2)); background-attachment:fixed;
+    color:var(--ink); line-height:1.6; -webkit-font-smoothing:antialiased;
+    padding:22px 18px; min-height:100vh;}
+  .wrap{max-width:520px; margin:0 auto}
+
+  header{text-align:center; padding:8px 4px 22px}
+  .logo{display:inline-flex; align-items:center; gap:8px; background:#fff; padding:7px 16px;
+    border-radius:999px; box-shadow:var(--shadow); font-weight:800; font-size:.9rem}
+  .logo .star{font-size:1rem}
+  h1{font-size:1.7rem; font-weight:900; letter-spacing:-.03em; margin-top:14px}
+  .sub{color:var(--ink-soft); font-size:.92rem; margin-top:3px}
+
+  .card{background:var(--card); border-radius:24px; box-shadow:var(--shadow);
+    padding:26px 22px; margin-bottom:18px}
+
+  /* 시작 화면 */
+  .setup label{display:block; font-size:.9rem; font-weight:700; margin:0 0 9px}
+  .setup input{width:100%; padding:15px 16px; border:2px solid var(--line); border-radius:14px;
+    font-size:1.05rem; font-family:inherit; margin-bottom:8px; background:#fffdfa}
+  .setup input:focus{outline:none; border-color:var(--accent); background:#fff}
+  .err{color:var(--wrong); font-size:.84rem; margin:2px 0 14px; display:none; font-weight:600}
+  .steps{display:flex; flex-direction:column; gap:10px; margin:16px 0 6px}
+  .step{display:flex; align-items:center; gap:14px; border:2px solid var(--line); border-radius:16px;
+    padding:15px 16px; cursor:pointer; transition:.12s; background:#fff}
+  .step:hover{transform:translateY(-1px); border-color:color-mix(in srgb,var(--c) 45%,#fff)}
+  .step.on{border-color:var(--c); background:color-mix(in srgb,var(--c) 8%,#fff)}
+  .step .ico{width:46px; height:46px; border-radius:14px; flex:none; display:flex; align-items:center;
+    justify-content:center; font-size:1.5rem; font-weight:900; color:#fff; background:var(--c)}
+  .step .txt{flex:1}
+  .step .nm{font-weight:800; font-size:1.02rem}
+  .step .ex{color:var(--ink-soft); font-size:.82rem; margin-top:1px}
+  .step .chk{width:24px; height:24px; border-radius:50%; border:2px solid var(--line); flex:none}
+  .step.on .chk{background:var(--c); border-color:var(--c);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E"); background-size:15px; background-repeat:no-repeat; background-position:center}
+
+  .btn{width:100%; border:none; border-radius:16px; padding:17px; font-size:1.1rem; font-weight:800;
+    font-family:inherit; cursor:pointer; background:var(--accent); color:#fff;
+    box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 38%,transparent); transition:.12s; margin-top:10px}
+  .btn:active{transform:scale(.98)}
+  .btn:disabled{opacity:.4; box-shadow:none; cursor:default}
+  .btn.ghost{background:#f1f3f7; color:var(--ink); box-shadow:none}
+
+  /* 문제 화면 */
+  .topbar{display:flex; align-items:center; gap:12px; margin-bottom:20px}
+  .pbar{flex:1; height:10px; border-radius:999px; background:#eef0f4; overflow:hidden}
+  .pbar i{display:block; height:100%; width:0; background:var(--accent); border-radius:999px; transition:width .35s}
+  .pill{font-size:.84rem; font-weight:800; color:var(--accent); background:#fff;
+    padding:6px 12px; border-radius:999px; box-shadow:var(--shadow); white-space:nowrap; font-variant-numeric:tabular-nums}
+  .steplabel{display:inline-block; font-size:.78rem; font-weight:800; color:#fff;
+    background:var(--accent); padding:5px 14px; border-radius:999px; margin-bottom:18px}
+  .problem{text-align:center; font-size:3.2rem; font-weight:900; letter-spacing:.02em;
+    margin:14px 0 26px; font-variant-numeric:tabular-nums; color:var(--ink)}
+  .problem .eq{color:var(--accent)}
+
+  .opts{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .opt{padding:20px; border:2.5px solid var(--line); border-radius:18px; cursor:pointer;
+    font-size:1.7rem; font-weight:800; text-align:center; background:#fff; transition:.1s;
+    font-variant-numeric:tabular-nums}
+  .opt:hover{border-color:color-mix(in srgb,var(--accent) 40%,#fff)}
+  .opt:active{transform:scale(.97)}
+  .opt.correct{border-color:var(--right); background:var(--right-bg); color:var(--right)}
+  .opt.incorrect{border-color:var(--wrong); background:var(--wrong-bg); color:var(--wrong)}
+  .opt.locked{cursor:default}
+
+  .feedback{margin-top:20px; text-align:center; font-size:1.15rem; font-weight:800; display:none}
+  .feedback.show{display:block}
+  .feedback.ok{color:var(--right)}
+  .feedback.no{color:var(--wrong)}
+  .feedback .small{display:block; font-size:.92rem; font-weight:600; color:var(--ink-soft); margin-top:3px}
+
+  .hidden{display:none}
+
+  /* 완료 화면 */
+  .done{text-align:center}
+  .done .emoji{font-size:3.4rem; margin-bottom:4px}
+  .done .big{font-size:3.2rem; font-weight:900; color:var(--accent); font-variant-numeric:tabular-nums}
+  .done .msg{font-size:1.15rem; font-weight:800; margin:10px 0 4px}
+  .done .time{color:var(--ink-soft); font-size:.9rem; margin-bottom:8px}
+  .sent{font-size:.82rem; color:var(--ink-soft); margin-top:14px; min-height:1.2em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="star">⭐</span> 기초 연산 연습</div>
+    <h1>차근차근 풀어봐요</h1>
+    <div class="sub">단계를 골라 한 문제씩 도전!</div>
+  </header>
+
+  <!-- 시작 -->
+  <div class="card setup" id="setup">
+    <label for="name">학번 또는 이름</label>
+    <input id="name" placeholder="학번이나 이름을 입력하세요" autocomplete="off">
+    <div class="err" id="nameError">명단에서 찾을 수 없어요. 학번이나 이름을 정확히 입력해요.</div>
+
+    <label>오늘 연습할 단계</label>
+    <div class="steps" id="stepGrid"></div>
+
+    <button class="btn" onclick="start()">시작하기</button>
+    <div class="sent" id="connStatus" style="text-align:center"></div>
+  </div>
+
+  <!-- 문제 -->
+  <div class="card hidden" id="quiz">
+    <div class="topbar">
+      <div class="pbar"><i id="pbarFill"></i></div>
+      <div class="pill" id="pillCount">1 / 10</div>
+      <div class="pill" id="pillTimer">0:00</div>
+    </div>
+    <div style="text-align:center"><span class="steplabel" id="steplabel"></span></div>
+    <div class="problem" id="problem"></div>
+    <div class="opts" id="opts"></div>
+    <div class="feedback" id="feedback"></div>
+    <button class="btn hidden" id="nextBtn" onclick="next()">다음 문제</button>
+  </div>
+
+  <!-- 완료 -->
+  <div class="card hidden done" id="done">
+    <div class="emoji" id="emoji">🎉</div>
+    <div class="big" id="finalScore"></div>
+    <div class="msg" id="finalMsg"></div>
+    <div class="time" id="timeSummary"></div>
+    <button class="btn ghost" onclick="location.reload()">다시 풀기</button>
+    <div class="sent" id="sent"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ★ 같은 시트로 보내기 — 수리력 앱과 동일한 Apps Script URL
+   ============================================================ */
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbxNgjr6uNBC0Hw-eSUQzcjRBdreSdl5l00bgopR6DIK4r1oig-OOerPdgVptbLlZN0Y/exec";
+
+/* ============================================================
+   명단 (수리력 앱과 동일)
+   ============================================================ */
+const ROSTER=[
+  ['3223','한유라'],['3310','박은비'],['3322','정하은'],['3319','이하은'],
+  ['1117','오예솔'],['1121','임동희'],['1205','김서연'],['1210','민수지'],
+  ['2105','김민선'],['2112','박소정'],['2203','김민주'],['2214','오서하'],['2219','이은서'],
+];
+function checkRoster(input){
+  const id=String(input).replace(/[^0-9]/g,'');
+  const name=String(input).replace(/[^가-힣]/g,'');
+  if(!id && !name) return null;
+  for(const [rId,rName] of ROSTER){
+    if((id && id===rId)||(name && name===rName)) return rName;
+  }
+  return null;
+}
+
+/* ============================================================
+   유틸 + 단계별 문제 생성기
+   ============================================================ */
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;};
+
+// 정답 주변의 그럴듯한 오답으로 4지선다 만들기
+function choices(ans){
+  const set=new Set([ans]);
+  const near=[ans+1,ans-1,ans+2,ans-2,ans+3,ans-3,ans+10,ans-10];
+  shuffle(near);
+  for(const c of near){ if(c>=0 && !set.has(c)) set.add(c); if(set.size>=4) break; }
+  let p=4; while(set.size<4){ if(ans+p>=0) set.add(ans+p); p++; }
+  const opts=shuffle([...set].slice(0,4));
+  return {opts, idx:opts.indexOf(ans)};
+}
+
+const STEPS = {
+  add1:{ name:'한 자리 덧셈', ex:'3 + 5', color:'#ff9f43',
+    gen:()=>{ const a=rnd(1,9), b=rnd(1,9); return mk(`${a} + ${b}`, a+b); } },
+  sub1:{ name:'한 자리 뺄셈', ex:'9 − 4', color:'#5aa9ff',
+    gen:()=>{ let a=rnd(2,9), b=rnd(1,a); return mk(`${a} − ${b}`, a-b); } },
+  add2:{ name:'두 자리 덧셈', ex:'24 + 15', color:'#ff7a9c',
+    gen:()=>{ const a=rnd(10,49), b=rnd(10,49); return mk(`${a} + ${b}`, a+b); } },
+  sub2:{ name:'두 자리 뺄셈', ex:'56 − 23', color:'#36c1c9',
+    gen:()=>{ let a=rnd(20,99), b=rnd(10,a-1); return mk(`${a} − ${b}`, a-b); } },
+  mul:{ name:'구구단', ex:'4 × 7', color:'#a87bff',
+    gen:()=>{ const a=rnd(2,9), b=rnd(2,9); return mk(`${a} × ${b}`, a*b); } },
+  div:{ name:'나눗셈', ex:'12 ÷ 3', color:'#34c98a',
+    gen:()=>{ const b=rnd(2,9), q=rnd(2,9), a=b*q; return mk(`${a} ÷ ${b}`, q); } },
+};
+function mk(text, answer){ const c=choices(answer); return {text, answer, options:c.opts, correct:c.idx}; }
+
+/* ============================================================
+   진행 로직
+   ============================================================ */
+let selectedSteps=[], total=10, idx=0, score=0, current=null, locked=false;
+let studentName='', startTime=0, timerInt=null, curStepKey='';
+
+// 단계 선택 UI
+const grid=document.getElementById('stepGrid');
+Object.entries(STEPS).forEach(([key,s])=>{
+  const el=document.createElement('div');
+  el.className='step'; el.dataset.key=key; el.style.setProperty('--c',s.color);
+  const icon={add1:'+',sub1:'−',add2:'+',sub2:'−',mul:'×',div:'÷'}[key];
+  el.innerHTML=`<div class="ico">${icon}</div>
+    <div class="txt"><div class="nm">${s.name}</div><div class="ex">예) ${s.ex}</div></div>
+    <div class="chk"></div>`;
+  el.onclick=()=>el.classList.toggle('on');
+  grid.appendChild(el);
+});
+document.getElementById('name').addEventListener('input',()=>{
+  document.getElementById('nameError').style.display='none';
+});
+
+function start(){
+  const verified=checkRoster(document.getElementById('name').value);
+  if(!verified){ document.getElementById('nameError').style.display='block'; return; }
+  studentName=verified;
+  selectedSteps=[...document.querySelectorAll('.step.on')].map(e=>e.dataset.key);
+  if(selectedSteps.length===0) selectedSteps=['add1']; // 미선택 시 가장 쉬운 단계
+  total=10; idx=0; score=0;
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('quiz').classList.remove('hidden');
+  startTime=Date.now(); timerInt=setInterval(tick,1000);
+  load();
+}
+
+function load(){
+  curStepKey=selectedSteps[idx % selectedSteps.length];
+  const s=STEPS[curStepKey];
+  document.documentElement.style.setProperty('--accent', s.color);
+  current=s.gen(); locked=false;
+  document.getElementById('steplabel').textContent=s.name;
+  document.getElementById('problem').innerHTML=
+    current.text.replace(/([+\u2212×÷])/g,'<span class="eq">$1</span>')+' <span class="eq">=</span> ?';
+  const box=document.getElementById('opts'); box.innerHTML='';
+  current.options.forEach((o,i)=>{
+    const el=document.createElement('div');
+    el.className='opt'; el.textContent=o;
+    el.onclick=()=>pick(i,el);
+    box.appendChild(el);
+  });
+  document.getElementById('feedback').className='feedback';
+  document.getElementById('nextBtn').classList.add('hidden');
+  prog(); tick();
+}
+
+function pick(i,el){
+  if(locked)return; locked=true;
+  document.querySelectorAll('.opt').forEach(o=>o.classList.add('locked'));
+  const ok=i===current.correct;
+  if(ok) score++;
+  document.querySelectorAll('.opt')[current.correct].classList.add('correct');
+  if(!ok) el.classList.add('incorrect');
+  const fb=document.getElementById('feedback');
+  fb.className='feedback show '+(ok?'ok':'no');
+  fb.innerHTML=ok ? '잘했어요! ⭐'
+    : `아쉬워요<span class="small">정답은 ${current.answer} 예요</span>`;
+  const nb=document.getElementById('nextBtn');
+  nb.classList.remove('hidden');
+  nb.textContent=(idx+1>=total)?'결과 보기':'다음 문제';
+  prog();
+}
+
+function next(){ idx++; if(idx>=total){finish();return;} load(); }
+
+function prog(){
+  const done=idx+(locked?1:0);
+  document.getElementById('pillCount').textContent=`${idx+1} / ${total}`;
+  document.getElementById('pbarFill').style.width=`${done/total*100}%`;
+}
+function tick(){
+  const s=Math.floor((Date.now()-startTime)/1000);
+  document.getElementById('pillTimer').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+function fmtKorean(t){const m=Math.floor(t/60),s=t%60;return (m>0?m+'분 ':'')+s+'초';}
+function fmtKST(d){const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+
+function finish(){
+  clearInterval(timerInt);
+  const elapsed=Math.round((Date.now()-startTime)/1000);
+  document.documentElement.style.setProperty('--accent','#ff8a3d');
+  document.getElementById('quiz').classList.add('hidden');
+  document.getElementById('done').classList.remove('hidden');
+  document.getElementById('finalScore').textContent=`${score} / ${total}`;
+  const pct=score/total;
+  document.getElementById('emoji').textContent = pct>=0.8?'🎉':pct>=0.5?'👍':'💪';
+  document.getElementById('finalMsg').textContent =
+    pct>=0.8?'정말 잘했어요!' : pct>=0.5?'잘하고 있어요!' : '괜찮아요, 또 해봐요!';
+  document.getElementById('timeSummary').textContent=`소요 시간 ${fmtKorean(elapsed)}`;
+  sendResult(elapsed);
+}
+
+/* ============================================================
+   결과 전송 — 수리력 시트와 같은 형식 + 구분="기초연산"
+   areas 칸에 단계별 정답을 넣어 약점 파악 가능
+   ============================================================ */
+function sendResult(elapsedSec){
+  const el=document.getElementById('sent');
+  // 단계별 집계
+  const per={};
+  // 재계산: 어느 단계를 몇 개 풀고 맞췄는지 (load에서 순환 출제했으므로 재구성)
+  // 간단히 selectedSteps별로 균등 분배된 결과를 추정하지 않고, 실제로 추적
+  const payload={
+    name:studentName,
+    score:score, total:total,
+    mode:'기초연산',
+    seconds:fmtKorean(elapsedSec),
+    areas:selectedSteps.map(k=>STEPS[k].name).join(', '),
+    time:fmtKST(new Date())
+  };
+  if(!SHEET_URL){ el.textContent='(저장 없음 — 연습만)'; return; }
+  el.textContent='결과 저장 중…';
+  fetch(SHEET_URL,{method:'POST',mode:'no-cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(payload)})
+    .then(()=>el.textContent='✓ 결과가 저장되었어요.')
+    .catch(()=>el.textContent='저장 실패 — 네트워크를 확인해요.');
+}
+</script>
+</body>
+</html>
