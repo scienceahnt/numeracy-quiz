@@ -155,6 +155,7 @@
 
     <label for="name">학번 / 이름</label>
     <input id="name" placeholder="예) 3101 홍길동" autocomplete="off">
+    <div id="nameError" style="color:var(--wrong); font-size:.82rem; margin:-10px 0 14px; display:none">명단에서 찾을 수 없어요. 학번이나 이름을 정확히 입력하세요.</div>
 
     <!-- 연습 모드 전용 -->
     <div id="practicePane">
@@ -230,6 +231,23 @@ const SHEET_URL = "https://script.google.com/macros/s/AKfycbxNgjr6uNBC0Hw-eSUQzc
 /* ============================================================
    ② 공통 유틸
    ============================================================ */
+// ▼▼ 명단 (학번, 이름) — 명단이 바뀌면 여기만 수정 후 다시 업로드 ▼▼
+const ROSTER=[
+  ['3223','한유라'],['3310','박은비'],['3322','정하은'],['3319','이하은'],
+  ['1117','오예솔'],['1121','임동희'],['1205','김서연'],['1210','민수지'],
+  ['2105','김민선'],['2112','박소정'],['2203','김민주'],['2214','오서하'],['2219','이은서'],
+];
+// 입력값이 명단에 있는지 검사 → 명단의 정식 이름 반환, 없으면 null
+function checkRoster(input){
+  const id   = String(input).replace(/[^0-9]/g,'');     // 숫자(학번)만
+  const name = String(input).replace(/[^가-힣]/g,'');   // 한글(이름)만
+  if(!id && !name) return null;                          // 아무것도 안 쓴 경우
+  for(const [rId,rName] of ROSTER){
+    if((id && id===rId) || (name && name===rName)) return rName;
+  }
+  return null;
+}
+
 const circled=['①','②','③','④','⑤'];
 const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;};
@@ -440,6 +458,10 @@ function setMode(m){
 
 // 영역 선택 UI 생성
 const grid=document.getElementById('areaGrid');
+// 이름 입력 중이면 에러 메시지 숨김
+document.getElementById('name').addEventListener('input',()=>{
+  document.getElementById('nameError').style.display='none';
+});
 Object.entries(AREAS).forEach(([key,a])=>{
   const el=document.createElement('div');
   el.className='area'; el.dataset.key=key;
@@ -451,7 +473,14 @@ Object.entries(AREAS).forEach(([key,a])=>{
 
 function startQuiz(){
   mode='practice';
-  studentName=document.getElementById('name').value.trim()||'(이름없음)';
+  // 명단 검사: 통과해야 시작
+  const verified=checkRoster(document.getElementById('name').value);
+  if(!verified){
+    document.getElementById('nameError').style.display='block';
+    return;
+  }
+  document.getElementById('nameError').style.display='none';
+  studentName=verified;   // 명단의 정식 이름으로 통일
   selectedAreas=[...document.querySelectorAll('.area.on')].map(e=>e.dataset.key);
   if(selectedAreas.length===0) selectedAreas=Object.keys(AREAS); // 미선택 시 전체
   total=Math.max(1,Math.min(30,parseInt(document.getElementById('count').value)||10));
@@ -465,14 +494,22 @@ function startQuiz(){
 }
 
 function startExam(){
+  // 명단 검사 먼저
+  const verified=checkRoster(document.getElementById('name').value);
+  if(!verified){
+    document.getElementById('nameError').style.display='block';
+    return;
+  }
+  document.getElementById('nameError').style.display='none';
   // 비밀번호 확인
   const pw=document.getElementById('examPw').value.trim();
   if(pw!==EXAM_PW){
     document.getElementById('pwError').style.display='block';
     return;
   }
+  document.getElementById('pwError').style.display='none';
   mode='exam';
-  studentName=document.getElementById('name').value.trim()||'(이름없음)';
+  studentName=verified;   // 명단의 정식 이름으로 통일
   // 영역 배분대로 25문항 미리 생성 후 섞기
   examQueue=[];
   selectedAreas=Object.keys(EXAM_PLAN);
