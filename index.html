@@ -121,6 +121,14 @@
     border:1.5px solid color-mix(in srgb,var(--accent) 22%,#fff); border-radius:13px;
     padding:14px 16px; font-size:.9rem; line-height:1.7; color:var(--ink); margin-bottom:18px}
 
+  /* 난이도 선택 */
+  .levelsel{display:flex; gap:10px; margin-bottom:18px}
+  .lvopt{flex:1; position:relative; cursor:pointer}
+  .lvopt input{position:absolute; opacity:0; pointer-events:none}
+  .lvopt span{display:block; text-align:center; padding:13px; border:2px solid var(--line);
+    border-radius:13px; font-weight:700; font-size:1rem; transition:.12s; background:#fff}
+  .lvopt input:checked + span{border-color:var(--accent); background:color-mix(in srgb,var(--accent) 9%,#fff); color:var(--accent)}
+
   /* 정기시험 오답 리뷰 */
   .review{text-align:left; margin:6px 0 4px}
   .review h3{font-size:.95rem; font-weight:800; margin:18px 0 12px; color:var(--ink)}
@@ -159,6 +167,11 @@
 
     <!-- 연습 모드 전용 -->
     <div id="practicePane">
+      <label>난이도</label>
+      <div class="levelsel">
+        <label class="lvopt"><input type="radio" name="practiceLevel" value="basic" checked><span>기본</span></label>
+        <label class="lvopt"><input type="radio" name="practiceLevel" value="adv"><span>심화</span></label>
+      </div>
       <label>영역 선택 <span style="font-weight:500;color:var(--ink-soft)">· 여러 개 고르면 골고루 출제</span></label>
       <div class="areas" id="areaGrid"></div>
       <label for="count">문제 수</label>
@@ -172,9 +185,11 @@
         6개 영역을 골고루 섞어 <b>25문항</b>을 출제합니다.<br>
         중간 채점 없이 <b>끝까지 푼 뒤 한 번에 채점</b>합니다.
       </div>
-      <label for="examPw">시험 비밀번호</label>
-      <input id="examPw" type="password" placeholder="선생님께 받은 번호" autocomplete="off" inputmode="numeric">
-      <div id="pwError" style="color:var(--wrong); font-size:.82rem; margin:-8px 0 14px; display:none">비밀번호가 올바르지 않습니다.</div>
+      <label>난이도</label>
+      <div class="levelsel">
+        <label class="lvopt"><input type="radio" name="examLevel" value="basic" checked><span>기본</span></label>
+        <label class="lvopt"><input type="radio" name="examLevel" value="adv"><span>심화</span></label>
+      </div>
       <button class="act primary" onclick="startExam()">시험 시작</button>
     </div>
 
@@ -288,9 +303,10 @@ const AREAS = {
   num: {
     label:'자연수의 수와 비교', chapters:'1·2장', color:'#4f8cff',
     generators:[
-      // 다섯 자리 수 읽기
-      ()=>{
-        const n=rnd(10000,99999), ans=readKorean(n);
+      // 다섯 자리 수 읽기 (심화: 여섯 자리)
+      (lv)=>{
+        const n = lv==='adv' ? rnd(100000,999999) : rnd(10000,99999);
+        const ans=readKorean(n);
         const {opts,idx}=buildChoices(ans,[
           ()=>readKorean(n).replace(/만/,''),
           ()=>readKorean(n).replace(/천/,'백'),
@@ -300,9 +316,10 @@ const AREAS = {
         ]);
         return {prompt:'다음 수를 바르게 읽은 것은?', figure:String(n), options:opts, answer:idx};
       },
-      // 크기 비교 (가장 큰/작은 수)
-      ()=>{
-        const arr=Array.from({length:5},()=>rnd(10000,99999));
+      // 크기 비교
+      (lv)=>{
+        const hi = lv==='adv' ? 999999 : 99999, lo = lv==='adv' ? 100000 : 10000;
+        const arr=Array.from({length:5},()=>rnd(lo,hi));
         const biggest=Math.max(...arr);
         const opts=arr.map(String), idx=arr.indexOf(biggest);
         return {prompt:'다음 중 가장 큰 수는?', figure:'아래 보기에서 고르세요', options:opts, answer:idx};
@@ -312,18 +329,23 @@ const AREAS = {
   muldiv: {
     label:'자연수 곱셈·나눗셈', chapters:'3·4·5·24장', color:'#9b6dff',
     generators:[
-      // (세 자리)×(두 자리)
-      ()=>{
-        const a=rnd(100,999), b=rnd(11,99), ans=a*b;
+      // (세 자리)×(두 자리) — 심화는 더 큰 수
+      (lv)=>{
+        const a = lv==='adv' ? rnd(300,999) : rnd(100,999);
+        const b = lv==='adv' ? rnd(25,99)  : rnd(11,99);
+        const ans=a*b;
         const {opts,idx}=buildChoices(String(ans),[
           ()=>ans+rnd(1,9)*10, ()=>ans-rnd(1,9)*10,
           ()=>a*(b+1), ()=>a*(b-1), ()=>ans+a, ()=>ans-a,
         ]);
         return {prompt:'다음을 계산한 결과는?', figure:`${a} × ${b}`, options:opts, answer:idx};
       },
-      // (세 자리)÷(두 자리), 나누어떨어지게
-      ()=>{
-        const b=rnd(11,40), q=rnd(5,30), a=b*q, ans=q;
+      // 나눗셈, 나누어떨어지게 — 심화는 (세 자리)÷(두 자리), 몫도 두 자리
+      (lv)=>{
+        let b,q;
+        if(lv==='adv'){ b=rnd(13,40); q=rnd(12,40); }   // 552 ÷ 24 = 23 류
+        else { b=rnd(11,40); q=rnd(5,30); }
+        const a=b*q, ans=q;
         const {opts,idx}=buildChoices(String(ans),[
           ()=>q+1, ()=>q-1, ()=>q+2, ()=>q-2, ()=>q+rnd(3,6),
         ]);
@@ -334,21 +356,35 @@ const AREAS = {
   fracadd: {
     label:'분수의 덧셈·뺄셈', chapters:'6·7·8·18·19장', color:'#ff6fa5',
     generators:[
-      // 분모 다른 분수 덧셈
-      ()=>{
-        const d1=rnd(2,6), d2=rnd(2,6), n1=rnd(1,d1-1), n2=rnd(1,d2-1);
+      // 분모 다른 분수 덧셈 — 심화는 분모 최대 12
+      (lv)=>{
+        const hi = lv==='adv' ? 12 : 6;
+        const d1=rnd(2,hi), d2=rnd(2,hi), n1=rnd(1,d1-1), n2=rnd(1,d2-1);
         const L=d1*d2/gcd(d1,d2);
         let num=n1*(L/d1)+n2*(L/d2), den=L;
         const [sn,sd]=simplify(num,den), ans=frac(sn,sd);
         const {opts,idx}=buildChoices(ans,[
-          ()=>frac(n1+n2,d1+d2),          // 분자분모 그냥 더하기(흔한 오답)
+          ()=>frac(n1+n2,d1+d2),
           ()=>frac(sn+1,sd), ()=>frac(sn,sd+1),
           ()=>frac(num,den), ()=>frac(sn+sd,sd),
         ]);
         return {prompt:'다음을 계산하여 기약분수로 나타내면?', figure:`${frac(n1,d1)} + ${frac(n2,d2)}`, options:opts, answer:idx};
       },
-      // 진분수 뺄셈(같은 분모)
-      ()=>{
+      // 뺄셈 — 기본은 같은 분모, 심화는 분모 다른 뺄셈
+      (lv)=>{
+        if(lv==='adv'){
+          const hi=12; let d1=rnd(2,hi), d2=rnd(2,hi);
+          let n1=rnd(1,d1-1), n2=rnd(1,d2-1);
+          const L=d1*d2/gcd(d1,d2);
+          let v1=n1*(L/d1), v2=n2*(L/d2);
+          if(v1<v2){ [d1,d2]=[d2,d1]; [n1,n2]=[n2,n1]; v1=n1*(L/d1); v2=n2*(L/d2); }
+          const [sn,sd]=simplify(v1-v2,L), ans=frac(sn,sd);
+          const {opts,idx}=buildChoices(ans,[
+            ()=>frac(n1-n2,d1-d2||1), ()=>frac(sn+1,sd),
+            ()=>frac(v1+v2,L), ()=>frac(sn,sd+1), ()=>frac(v1-v2,L),
+          ]);
+          return {prompt:'다음을 계산하여 기약분수로 나타내면?', figure:`${frac(n1,d1)} − ${frac(n2,d2)}`, options:opts, answer:idx};
+        }
         const d=rnd(4,9), n1=rnd(2,d-1), n2=rnd(1,n1-1);
         const [sn,sd]=simplify(n1-n2,d), ans=frac(sn,sd);
         const {opts,idx}=buildChoices(ans,[
@@ -362,9 +398,10 @@ const AREAS = {
   fracmul: {
     label:'분수의 곱셈·나눗셈', chapters:'20·21·22·25·27·28장', color:'#ff924c',
     generators:[
-      // (진분수)×(진분수)
-      ()=>{
-        const d1=rnd(2,6), d2=rnd(2,6), n1=rnd(1,d1-1), n2=rnd(1,d2-1);
+      // (진분수)×(진분수) — 심화는 분모 최대 12
+      (lv)=>{
+        const hi = lv==='adv' ? 12 : 6;
+        const d1=rnd(2,hi), d2=rnd(2,hi), n1=rnd(1,d1-1), n2=rnd(1,d2-1);
         const [sn,sd]=simplify(n1*n2,d1*d2), ans=frac(sn,sd);
         const {opts,idx}=buildChoices(ans,[
           ()=>frac(n1*n2,d1+d2), ()=>frac(sn+1,sd),
@@ -372,8 +409,17 @@ const AREAS = {
         ]);
         return {prompt:'다음을 계산하여 기약분수로 나타내면?', figure:`${frac(n1,d1)} × ${frac(n2,d2)}`, options:opts, answer:idx};
       },
-      // (분수)÷(자연수)
-      ()=>{
+      // 분수 나눗셈 — 기본은 (분수)÷(자연수), 심화는 (분수)÷(분수)
+      (lv)=>{
+        if(lv==='adv'){
+          const d1=rnd(2,9), d2=rnd(2,9), n1=rnd(1,d1-1), n2=rnd(1,d2-1);
+          const [sn,sd]=simplify(n1*d2, d1*n2), ans=frac(sn,sd);
+          const {opts,idx}=buildChoices(ans,[
+            ()=>frac(n1*n2,d1*d2), ()=>frac(sn+1,sd),
+            ()=>frac(n1*d2,d1*n2), ()=>frac(sd,sn), ()=>frac(sn,sd+1),
+          ]);
+          return {prompt:'다음을 계산하여 기약분수로 나타내면?', figure:`${frac(n1,d1)} ÷ ${frac(n2,d2)}`, options:opts, answer:idx};
+        }
         const d=rnd(2,7), n=rnd(1,d-1), k=rnd(2,5);
         const [sn,sd]=simplify(n,d*k), ans=frac(sn,sd);
         const {opts,idx}=buildChoices(ans,[
@@ -387,8 +433,17 @@ const AREAS = {
   dec: {
     label:'소수 계산', chapters:'10·11·23·26·29·30장', color:'#15bcc4',
     generators:[
-      // 소수 덧셈
-      ()=>{
+      // 소수 덧셈 — 심화는 소수 둘째 자리
+      (lv)=>{
+        if(lv==='adv'){
+          const a=rnd(10,999)/100, b=rnd(10,999)/100;
+          const ans=(Math.round((a+b)*100)/100).toFixed(2);
+          const {opts,idx}=buildChoices(ans,[
+            ()=>(parseFloat(ans)+0.1).toFixed(2), ()=>(parseFloat(ans)-0.01).toFixed(2),
+            ()=>(parseFloat(ans)+1).toFixed(2), ()=>(a*b).toFixed(2), ()=>(parseFloat(ans)+0.02).toFixed(2),
+          ]);
+          return {prompt:'다음을 계산한 결과는?', figure:`${a.toFixed(2)} + ${b.toFixed(2)}`, options:opts, answer:idx};
+        }
         const a=rnd(1,99)/10, b=rnd(1,99)/10;
         const ans=(Math.round((a+b)*10)/10).toFixed(1);
         const {opts,idx}=buildChoices(ans,[
@@ -397,9 +452,10 @@ const AREAS = {
         ]);
         return {prompt:'다음을 계산한 결과는?', figure:`${a.toFixed(1)} + ${b.toFixed(1)}`, options:opts, answer:idx};
       },
-      // 소수 × 소수
-      ()=>{
-        const a=rnd(2,29)/10, b=rnd(2,19)/10;
+      // 소수 × 소수 — 심화는 더 큰 소수
+      (lv)=>{
+        const a = lv==='adv' ? rnd(15,99)/10 : rnd(2,29)/10;
+        const b = lv==='adv' ? rnd(15,49)/10 : rnd(2,19)/10;
         const ans=(Math.round(a*b*100)/100).toFixed(2);
         const {opts,idx}=buildChoices(ans,[
           ()=>(parseFloat(ans)+0.1).toFixed(2), ()=>(a*b*10).toFixed(2),
@@ -412,17 +468,26 @@ const AREAS = {
   mix: {
     label:'혼합 계산·약수배수', chapters:'12·13장', color:'#36c98a',
     generators:[
-      // 혼합 계산 (곱셈 먼저)
-      ()=>{
+      // 혼합 계산 — 심화는 괄호 포함, 더 큰 수
+      (lv)=>{
+        if(lv==='adv'){
+          const a=rnd(2,9), b=rnd(2,9), c=rnd(2,9), d=rnd(2,9);
+          const ans=(a+b)*c-d;
+          const {opts,idx}=buildChoices(String(ans),[
+            ()=>a+b*c-d, ()=>(a+b)*(c-d), ()=>ans+1, ()=>ans-1, ()=>(a+b)*c+d,
+          ]);
+          return {prompt:'다음을 계산한 결과는?', figure:`(${a} + ${b}) × ${c} − ${d}`, options:opts, answer:idx};
+        }
         const a=rnd(1,9), b=rnd(2,9), c=rnd(2,9), ans=a+b*c;
         const {opts,idx}=buildChoices(String(ans),[
           ()=>(a+b)*c, ()=>ans+1, ()=>ans-1, ()=>a*b+c, ()=>ans+c,
         ]);
         return {prompt:'다음을 계산한 결과는?', figure:`${a} + ${b} × ${c}`, options:opts, answer:idx};
       },
-      // 최대공약수
-      ()=>{
-        const g=rnd(2,9), a=g*rnd(2,6), b=g*rnd(2,6);
+      // 최대공약수 — 심화는 더 큰 수
+      (lv)=>{
+        const gh = lv==='adv' ? 15 : 9, mh = lv==='adv' ? 9 : 6;
+        const g=rnd(2,gh), a=g*rnd(2,mh), b=g*rnd(2,mh);
         const ans=gcd(a,b);
         const {opts,idx}=buildChoices(String(ans),[
           ()=>ans+1, ()=>ans-1, ()=>ans*2, ()=>gcd(a,b)+rnd(2,4), ()=>a%b||2,
@@ -441,8 +506,8 @@ let selectedAreas=[];
 let perArea={};          // {areaKey:{solved, correct}}
 let startTime=0, timerInt=null;
 let mode='practice';     // 'practice' | 'exam'
+let level='basic';       // 'basic' | 'adv'
 let examQueue=[];        // 시험 모드: 미리 만든 문제 + 학생 선택 저장
-const EXAM_PW='11618';   // 정기시험 비밀번호
 // 정기시험 영역별 문항 배분 (합계 25)
 const EXAM_PLAN={num:4, muldiv:4, fracadd:4, fracmul:4, dec:5, mix:4};
 
@@ -453,7 +518,6 @@ function setMode(m){
   document.getElementById('tabExam').classList.toggle('on', m==='exam');
   document.getElementById('practicePane').classList.toggle('hidden', m!=='practice');
   document.getElementById('examPane').classList.toggle('hidden', m!=='exam');
-  document.getElementById('pwError').style.display='none';
 }
 
 // 영역 선택 UI 생성
@@ -481,6 +545,7 @@ function startQuiz(){
   }
   document.getElementById('nameError').style.display='none';
   studentName=verified;   // 명단의 정식 이름으로 통일
+  level=document.querySelector('input[name="practiceLevel"]:checked').value;
   selectedAreas=[...document.querySelectorAll('.area.on')].map(e=>e.dataset.key);
   if(selectedAreas.length===0) selectedAreas=Object.keys(AREAS); // 미선택 시 전체
   total=Math.max(1,Math.min(30,parseInt(document.getElementById('count').value)||10));
@@ -501,14 +566,8 @@ function startExam(){
     return;
   }
   document.getElementById('nameError').style.display='none';
-  // 비밀번호 확인
-  const pw=document.getElementById('examPw').value.trim();
-  if(pw!==EXAM_PW){
-    document.getElementById('pwError').style.display='block';
-    return;
-  }
-  document.getElementById('pwError').style.display='none';
   mode='exam';
+  level=document.querySelector('input[name="examLevel"]:checked').value;
   studentName=verified;   // 명단의 정식 이름으로 통일
   // 영역 배분대로 25문항 미리 생성 후 섞기
   examQueue=[];
@@ -518,7 +577,7 @@ function startExam(){
     const area=AREAS[key];
     for(let i=0;i<n;i++){
       const gen=area.generators[rnd(0,area.generators.length-1)];
-      const q=gen(); q.areaKey=key; q.picked=-1;
+      const q=gen(level); q.areaKey=key; q.picked=-1;
       examQueue.push(q);
     }
   });
@@ -547,7 +606,7 @@ function loadQuestion(){
     currentAreaKey=selectedAreas[idx % selectedAreas.length];
     const area=AREAS[currentAreaKey];
     const gen=area.generators[rnd(0,area.generators.length-1)];
-    current=gen();
+    current=gen(level);
   }
   const area=AREAS[currentAreaKey];
   document.documentElement.style.setProperty('--accent', mode==='exam' ? '#5b6ef5' : area.color);
@@ -719,7 +778,7 @@ function sendResult(elapsed){
   const sec=Math.round(elapsed/1000);
   const payload={
     name:studentName, score:score, total:total,
-    mode:(mode==='exam'?'정기시험':'연습'),
+    mode:(mode==='exam'?'정기시험':'연습')+(level==='adv'?'(심화)':''),
     seconds:fmtKorean(sec),
     areas:selectedAreas.map(k=>`${AREAS[k].label}:${perArea[k].correct}/${perArea[k].solved}`).join(' | '),
     time:fmtKST(new Date())
